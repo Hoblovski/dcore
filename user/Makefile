@@ -11,6 +11,9 @@ APPS := $(wildcard $(APP_DIR)/*.rs)
 ELFS := $(patsubst $(APP_DIR)/%.rs, $(TARGET_DIR)/%, $(APPS))
 BINS := $(patsubst $(APP_DIR)/%.rs, $(TARGET_DIR)/%.bin, $(APPS))
 
+# Configs
+APP_BASE_ADDRESS := 0x80400000
+
 # commands
 .PHONY:
 	all bin elf run fmt clean .force
@@ -36,7 +39,7 @@ clean:
 # files
 $(ELFS): $(TARGET_DIR)/%: .force
 	@echo "/* Generated from src/linker.lds. Do not modify. */" > src/linker.ld
-	@sed '1d; s/{{BASE_ADDRESS}}/0x80400000;/g' src/linker.lds >> src/linker.ld
+	@sed '1d; s/{{BASE_ADDRESS}}/$(APP_BASE_ADDRESS);/g' src/linker.lds >> src/linker.ld
 	@cargo build --bin $*
 	@rm src/linker.ld
 

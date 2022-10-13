@@ -12,7 +12,7 @@ KERNEL_ENTRY_PA := 0x80200000
 
 # commands
 .PHONY:
-	all build run fmt clean
+	all build run fmt clean gdb1 gdb2 objdump .force
 
 all: build
 
@@ -31,9 +31,27 @@ fmt:
 clean:
 	@cargo clean
 
+gdb1:
+	@qemu-system-riscv64 \
+		-machine virt \
+		-nographic \
+		-bios $(BOOTLOADER) \
+		-device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA) \
+		-s -S
+
+gdb2:
+	@riscv64-unknown-elf-gdb -e .gdbinit
+
+objdump:
+	@rust-objdump -D $(KERNEL_ELF) > k.S
+	@echo "Target objdump'ed to k.S"
+
+
+.force:
+
 # files
-$(KERNEL_ELF):
+$(KERNEL_ELF): .force
 	@cargo build
 
-$(KERNEL_BIN): $(KERNEL_ELF)
+$(KERNEL_BIN): $(KERNEL_ELF) .force
 	@$(OBJCOPY) $(KERNEL_ELF) --strip-all -O binary $@

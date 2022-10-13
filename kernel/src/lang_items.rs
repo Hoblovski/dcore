@@ -1,5 +1,4 @@
-//! Items required by the Rust language.
-
+/// Items required by the Rust language.
 use core::panic::PanicInfo;
 
 #[panic_handler]
