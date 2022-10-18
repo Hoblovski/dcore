@@ -1,78 +1,94 @@
 # Trap assembly.
 # On any trap, the control flow jumps to __alltraps.
 
+# NOTE: these macros require sp to point to TRAP_CONTEXT
 .altmacro
-.macro SAVE_GP n
+.macro SAVE_GPR n
     sd x\n, \n*8(sp)
 .endm
-.macro LOAD_GP n
+.macro LOAD_GPR n
     ld x\n, \n*8(sp)
 .endm
 
-    .section .text
+# NOTE: CSR save/load will clobber t0.
+.macro SAVE_CSR_ csr n
+    csrr t0, \csr
+    sd t0, \n*8(sp)
+.endm
+.macro LOAD_CSR_ csr n
+    ld t0, \n*8(sp)
+    csrw \csr, t0
+.endm
+
+    .section .text.trampoline
     .globl __alltraps
     .globl __restore
     .align 2
 __alltraps:
     # FROM: user-mode traps (synchronous exception/ecall or asynchronous interrupt)
     #       or kernel-mode interrupts (only in scheduler context)
+    # TODO: kernel traps
     # REQUIRES:
-    #       sscratch = kernel sp
-    #           TODO what bout kernel intr
+    #       sscratch = TrapContext state save area virtual address (in user address space)
     # HW SIDE EFFECTS:
     #       sie = OFF
     csrrw sp, sscratch, sp
     # ASSERT:
-    #   sp = kernel sp
+    #   sp = TrapContext state save area (the LSB i.e. byte 0) = TRAP_CONTEXT
     #   sscratch = user sp
-    addi sp, sp, -34*8
     # save general-purpose registers
-    sd x1, 1*8(sp)
-    # skip sp(x2): done at last step
-    sd x3, 3*8(sp)
-    # skip tp(x4): application does not use it
-    # save x5~x31
+    SAVE_GPR 1
+    SAVE_GPR 3
     .set n, 5
     .rept 27
-        SAVE_GP %n
+        SAVE_GPR %n
         .set n, n+1
     .endr
-    csrr t0, sstatus
-    sd t0, 32*8(sp)
-    csrr t1, sepc
-    sd t1, 33*8(sp)
-    # save sp(x2): on trap context user sp should be saved
-    csrr t2, sscratch
-    sd t2, 2*8(sp)
-    # call trap_handler(cx: &mut TrapContext)
-    mv a0, sp
-    call trap_handler
+    # save sp. must be placed after SAVE_GPR since it clobbers t0
+    SAVE_CSR_ sscratch 2
+    # save CSRs
+    SAVE_CSR_ sstatus 32
+    SAVE_CSR_ sepc 33
+
+    # load trap handler address
+    ld t0, 36*8(sp)
+    # load kernel satp
+    ld t1, 34*8(sp)
+    # switch to kernel stack
+    # CORRECTNESS:
+    #       this only happens after all `*(sp)` uses,
+    #       or data can be loaded/stored from wrong address i.e. not within the TRAP_CONTEXT page.
+    ld sp, 35*8(sp)
+    # switch to kernel satp
+    # CORRECTNESS:
+    #       this only happens after all `*(sp)` uses
+    #       since they are on the TRAP_CONTEXT page which is not mapped in kernel address space.
+    csrw satp, t1
+    sfence.vma
+    # jump to trap handler
+    jr t0
 
 __restore:
     # FROM: the end of interrupt handling
     #       or the beginning of a new thread
     # REQUIRES:
-    #
-    # now sp->kernel stack(after allocated), sscratch->user stack
-    # restore sstatus/sepc
-    ld t0, 32*8(sp)
-    csrw sstatus, t0
-    ld t1, 33*8(sp)
-    csrw sepc, t1
-    ld t2, 2*8(sp)
-    csrw sscratch, t2
-    ld x1, 1*8(sp)
-    # skip sp: done at last step
-    ld x3, 3*8(sp)
-    # skip tp.
+    #       a0 = TrapContext state save area = TRAP_CONTEXT
+    #       a1 = user_satp
+    # switch to user satp
+    csrw satp, a1
+    sfence.vma
+    # restore GPR and CSR from TrapContext
+    csrw sscratch, a0
+    mv sp, a0
+    LOAD_CSR_ sstatus 32
+    LOAD_CSR_ sepc 33
+    LOAD_GPR 1
+    LOAD_GPR 3
     .set n, 5
     .rept 27
-        LOAD_GP %n
+        LOAD_GPR %n
         .set n, n+1
     .endr
-    addi sp, sp, 34*8
-    csrrw sp, sscratch, sp
-    # ASSERT:
-    #   sscratch = kernel sp
+    # switch to user stack
+    ld sp, 2*8(sp)
     sret
-    # TO: where control flow was before trap

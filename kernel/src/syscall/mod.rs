@@ -1,5 +1,5 @@
 /// Implementation of syscall dispatching.
-use crate::task::TASK_MANAGER;
+use crate::{mm::translated_byte_buffer, task::TASK_MANAGER};
 
 mod syscall_no {
     pub const WRITE: usize = 64;
@@ -25,9 +25,10 @@ const FD_STDOUT: usize = 1;
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     match fd {
         FD_STDOUT => {
-            let slice = unsafe { core::slice::from_raw_parts(buf, len) };
-            let str = core::str::from_utf8(slice).unwrap();
-            print!("{}", str);
+            let buffers = translated_byte_buffer(TASK_MANAGER.current_user_token(), buf, len);
+            for buffer in buffers {
+                print!("{}", core::str::from_utf8(buffer).unwrap());
+            }
             len as isize
         }
         _ => {

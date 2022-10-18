@@ -12,7 +12,7 @@ KERNEL_ENTRY_PA := 0x80200000
 
 # commands
 .PHONY:
-	all build run fmt clean gdb1 gdb2 objdump .force
+	all build run fmt fix clean gdb1 gdb2 objdump .force
 
 all: build
 
@@ -27,6 +27,9 @@ run: build
 
 fmt:
 	@cargo fmt
+
+fix:
+	@cargo fix --bin dcore-kernel
 
 clean:
 	@cargo clean

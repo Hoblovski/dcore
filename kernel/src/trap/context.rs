@@ -20,21 +20,35 @@ pub struct TrapContext {
     pub gpr: [usize; 32],
     pub sstatus: Sstatus,
     pub sepc: usize,
+    // Read only fields follow
+    pub kernel_satp: usize,
+    pub kernel_sp: usize,
+    pub trap_handler: usize,
 }
 
 impl TrapContext {
-    /// Create initial trap context for a user program.
+    /// Create the initial trap context for a user program.
     /// Control flow enters user program via `__restore`.
     ///
     /// * `entry`: entry address.
     /// * `sp`: points to the end of user stack.
-    pub fn create_init_user(entry: usize, stack_top: usize) -> Self {
+    /// * `kernel_satp` .. `trap_handler`: read-only fields.
+    pub fn create_user(
+        entry: usize,
+        stack_top: usize,
+        kernel_satp: usize,
+        kernel_sp: usize,
+        trap_handler: usize,
+    ) -> Self {
         let mut sstatus = sstatus::read();
         sstatus.set_spp(SPP::User);
         let mut cx = Self {
             gpr: [0; 32],
             sstatus,
             sepc: entry,
+            kernel_satp,
+            kernel_sp,
+            trap_handler,
         };
         cx.gpr[regs_index::SP] = stack_top;
         cx

@@ -8,8 +8,10 @@ tbreak rust_main
 define n
   if $argc == 0
     next
-  else if $argc == 1
-    next $arg0
+  else
+    if $argc == 1
+      next $arg0
+    end
   end
   refresh
 end
@@ -17,8 +19,10 @@ end
 define si
   if $argc == 0
     stepi
-  else if $argc == 1
-    stepi $arg0
+  else
+    if $argc == 1
+      stepi $arg0
+    end
   end
   refresh
 end

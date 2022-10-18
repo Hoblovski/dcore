@@ -12,7 +12,7 @@ ELFS := $(patsubst $(APP_DIR)/%.rs, $(TARGET_DIR)/%, $(APPS))
 BINS := $(patsubst $(APP_DIR)/%.rs, $(TARGET_DIR)/%.bin, $(APPS))
 
 # Configs
-APP_BASE_ADDRESS := 0x80400000
+APP_BASE_ADDRESS := 0x10000
 
 # commands
 .PHONY:
